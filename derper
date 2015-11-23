@@ -1,0 +1,184 @@
+#!/usr/bin/env python
+
+import subprocess
+import sys
+import os
+import json
+import os.path 
+
+config = None
+RC_FILE = os.path.expanduser('~/.derperrc')
+GIT_ORIGIN = "git@github.com:"
+
+
+def exit_gracefully(exit_code=0):
+    with open(RC_FILE, 'w') as fp:
+        json.dump(config, fp)
+    exit(exit_code)
+
+
+def print_help(chapter=None):
+    chapters = {
+        'config':
+"""
+remote set      Set the remote to a GitHub repository.                
+                derper remote set FitMango/Derper
+
+remote remove   Remove the configured remote
+                derper remote remove
+"""
+    }
+
+    if chapter is None:
+        print '\n'.join([v for _, v in chapters.iteritems()])
+    else:
+        print chapters[chapter]
+    exit_gracefully()
+
+
+def check_config_file():
+    """
+    Checks for the existence of a derperrc in the home dir.
+    If it doesn't exist, creates one.
+
+    Returns:
+        True if it existed previously, False if it was created
+    """
+    if not os.path.isfile(RC_FILE):
+        with open(RC_FILE,'w') as f: 
+            return False
+    return True
+
+
+def load_config():
+    if check_config_file():
+        with open(RC_FILE, 'r+') as rc:    
+            global config
+            config = json.load(rc)
+    else:
+        config = {}
+
+
+def arg_expand(cmd, prefix=None):
+    """
+    Returns an array consisting of that option, as well as that 
+    option prefixed with --, plus its single-char representation.
+    If prefix is specified, uses that instead of first character.
+
+    Arguments:
+        cmd (str): The command to prefix
+        prefix (str): The single-character of that command
+
+    Returns:
+        str[]
+    """
+
+    if prefix is None:
+        prefix = cmd[0]
+
+    return [cmd, '--' + cmd, prefix, '-' + prefix]
+
+
+def configure(args):
+    if len(args) == 0:
+        print_help('config')
+    
+    if args[0] == "remote":
+        # We're modifying the remote. Let's edit the derperrc.
+        if len(args) is 1:
+            print config['remote']
+            exit_gracefully()
+        if args[1] == "add":
+            if "remote" in config:
+                print("Remote is already set to {}." +
+                      "Remove before adding a new one.".format(config["remote"]))
+                exit_gracefully(1)
+            else:
+                config['remote'] = args[2]
+        elif args[1] == "remove":
+            del config['remote']
+    elif args[0] == "url":
+        # We're modifying the url. Let's edit the derperrc.
+        if len(args) is 1:
+            print config['url']
+            exit_gracefully()
+        if args[1] == "add":
+            if "url" in config:
+                print("URL is already set to {}." +
+                      "Remove before adding a new one.".format(config['url']))
+                exit_gracefully(1)
+            else:
+                config['url'] = args[2]
+        elif args[1] == "remove":
+            del config['url']
+    exit_gracefully()
+
+
+def cleanup():
+    # Kill all the temps.
+    subprocess.call('killall mongod', shell=True)
+    subprocess.call('killall node', shell=True)
+    subprocess.call('rm -rf {}/*'.format(os.path.expanduser('~/.derper_files')), shell=True)
+    config['port'] = 3000
+
+
+
+def add_to_nginx(branch, port):
+    text = """
+    server {
+        listen   80;
+        server_name %s;
+       
+        location / {
+            auth_basic "Restricted";
+            auth_basic_user_file /etc/nginx/.htpasswd;
+            proxy_pass http://0.0.0.0:%s;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        }
+    }
+    """ % (branch + "." + config["url"], port)
+
+    with open('/etc/nginx/sites-available/default', 'a') as fh:
+        fh.write(text + '\n')
+
+
+
+def serve(args):
+    if "next_port" not in config:
+        config["next_port"] = 3000
+
+    branch = args[0]
+
+    subprocess.check_call("git clone {}{} {}/.derper_files/{}".format(GIT_ORIGIN, config['remote'], os.path.expanduser('~'), args[0]), shell=True)
+    subprocess.check_call('cd {} && git checkout {} && meteor --settings settings.json --port {} &'.format(os.path.expanduser('~/.derper_files/' + branch), branch, config["next_port"]), shell=True)
+    
+    add_to_nginx(branch, config["next_port"])
+    subprocess.check_call('sudo service nginx reload', shell=True)
+
+    config["next_port"] += 2
+    exit_gracefully()
+
+
+def main(args):
+    check_config_file()
+    load_config()
+
+    if len(args) < 1 or args[0] in arg_expand('help'):
+        print_help()
+
+    if args[0] in arg_expand('config'):
+        configure(args[1:])
+
+    if args[0] in arg_expand('serve'):
+        serve(args[1:])
+
+    if args[0] in arg_expand('cleanup', 'r'):
+        cleanup()
+
+    return
+
+
+if __name__ == "__main__":
+    main(sys.argv[1:])
