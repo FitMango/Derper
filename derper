@@ -119,8 +119,13 @@ def cleanup():
     subprocess.call('killall mongod', shell=True)
     subprocess.call('killall node', shell=True)
     subprocess.call('rm -rf {}/*'.format(os.path.expanduser('~/.derper_files')), shell=True)
+    subprocess.call('mkdir {}/logs'.format(os.path.expanduser('~/.derper_files')), shell=True)
     config['port'] = 3000
+    exit_gracefully()
 
+
+def broadcast(cmd):
+    subprocess.call("for d in {}/de_*/ ; do (cd \"$d\" && {}); done".format(os.path.expanduser('~/.derper_files'), cmd), shell=True)
 
 
 def add_to_nginx(branch, port):
@@ -140,10 +145,13 @@ def add_to_nginx(branch, port):
     }
     """ % (branch + "." + config["url"], port)
 
-    with open('/etc/nginx/sites-available/default', 'a') as fh:
+    with open(os.path.expanduser('~/.derper_files/default'), 'a') as fh:
         fh.write(text + '\n')
 
-
+def roll_nginx():
+    subprocess.call(['sudo', 'mv', os.path.expanduser('~/.derper_files/default'), '/etc/nginx/sites-available/default'])
+    subprocess.check_call('sudo service nginx reload', shell=True)
+    subprocess.call(['sudo', 'cp', '/etc/nginx/sites-available/default', os.path.expanduser('~/.derper_files/default')])
 
 def serve(args):
     if "next_port" not in config:
@@ -151,11 +159,10 @@ def serve(args):
 
     branch = args[0]
 
-    subprocess.check_call("git clone {}{} {}/.derper_files/{}".format(GIT_ORIGIN, config['remote'], os.path.expanduser('~'), args[0]), shell=True)
-    subprocess.check_call('cd {} && git checkout {} && meteor --settings settings.json --port {} &'.format(os.path.expanduser('~/.derper_files/' + branch), branch, config["next_port"]), shell=True)
+    subprocess.check_call("git clone {}{} {}/.derper_files/de_{}".format(GIT_ORIGIN, config['remote'], os.path.expanduser('~'), args[0]), shell=True)
+    subprocess.check_call('cd {} && git checkout {} && meteor --settings settings.json --port {} > ../logs/{} &'.format(os.path.expanduser('~/.derper_files/de_' + branch), branch, config["next_port"], branch), shell=True)
     
     add_to_nginx(branch, config["next_port"])
-    subprocess.check_call('sudo service nginx reload', shell=True)
 
     config["next_port"] += 2
     exit_gracefully()
@@ -173,6 +180,12 @@ def main(args):
 
     if args[0] in arg_expand('serve'):
         serve(args[1:])
+
+    if args[0] in arg_expand('broadcast'):
+        broadcast(''.join(args[1:]))
+
+    if args[0] == 'roll':
+        roll_nginx()
 
     if args[0] in arg_expand('cleanup', 'r'):
         cleanup()
