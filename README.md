@@ -15,6 +15,7 @@ A janky Docker replacement for spinning up a ton of temporary Meteor instances f
     
     Serve the master branch at `master.[url]`, where `url` is specified in the config.
 - **`cleanup`** Kills and cleans up after all temps.
+- **`broadcast`** Broadcast a command to all of the meteor directories. Useful for things like `derper broadcast "rm annoyingfile"`
 
 
 ## Example session
