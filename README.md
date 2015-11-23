@@ -24,6 +24,8 @@ derper config remote add j6k4m8/meteor-todo
 derper config url add todos.jordan.matelsky.com
 
 derper serve testbranch1
+
+derper roll
 ```
 
 This will result in the `testbranch1` branch of the `meteor-todo` repo being served at `testbranch1.todos.jordan.matelsky.com`, and `testbranch2` being served at `testbranch2.todos.jordan.matelsky.com`.
@@ -34,4 +36,7 @@ This makes deploying microservers very easy:
 from subprocess import call
 for branch in ['master', 'dev', 'production', 'janky-fix']:
     call(['derper', 'serve', branch])
+call(['derper', 'roll'])
 ```
+
+The trailing `derper roll` is very important: This is what gives the signal for nginx to roll the new configuration.
