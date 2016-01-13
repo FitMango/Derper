@@ -22,10 +22,10 @@ def print_help(chapter=None):
         'config':
 """
 remote set      Set the remote to a GitHub repository.                
-                derper remote set FitMango/Derper
+                `derper remote set FitMango/Derper`
 
 remote remove   Remove the configured remote
-                derper remote remove
+                `derper remote remove`
 """
     }
 
@@ -40,6 +40,9 @@ def check_config_file():
     """
     Checks for the existence of a derperrc in the home dir.
     If it doesn't exist, creates one.
+    
+    Arguments:
+        None
 
     Returns:
         True if it existed previously, False if it was created
@@ -70,7 +73,7 @@ def arg_expand(cmd, prefix=None):
         prefix (str): The single-character of that command
 
     Returns:
-        str[]
+        str[] all options that could be used to 'mean' that cmd
     """
 
     if prefix is None:
