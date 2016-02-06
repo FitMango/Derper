@@ -41,3 +41,7 @@ call(['derper', 'roll'])
 ```
 
 The trailing `derper roll` is very important: This is what gives the signal for nginx to roll the new configuration.
+
+
+<img src="https://cloud.githubusercontent.com/assets/693511/12869381/c9085f7a-cceb-11e5-9058-3863764413dd.png" width="50%">
+
